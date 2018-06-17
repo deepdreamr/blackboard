@@ -8,7 +8,7 @@ using System.Diagnostics;
 using WebSocketSharp;
 using System.DrawingCore;
 using System.DrawingCore.Imaging;
-
+using System.IO;
 
 namespace blackboardserver.Session
 {
@@ -18,8 +18,9 @@ namespace blackboardserver.Session
         public List<UserInput> InputHistory { get; private set; }
         //public long LastTimeSaved { get; set; }
         public string SessionName { get; private set; }
-        private readonly int width;
-        private readonly int height;
+
+        public int Width { get; private set; }
+        public int Height { get; private set; }
 
         private Stopwatch saveTimer;
 
@@ -32,31 +33,25 @@ namespace blackboardserver.Session
             InputHistory = new List<UserInput>();
            // LastTimeSaved = saveTimer.ElapsedMilliseconds;
 
-            this.width = width;
-            this.height = height;
+            Width = width;
+            Height = height;
         }
 
         public void SaveInputsToImage()
         {
-            Graphics g;
-            if (System.IO.File.Exists($"{connectedUsers[0].SessionId}/save.png"))
-                g = Graphics.FromImage(Bitmap.FromFile($@"blackboard/
-                                    {connectedUsers[0].SessionId}/save.png"));
-            else
-            {
-                Bitmap bm = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-
-                g = Graphics.FromImage(bm);
-            }
+            Image bm = Bitmap.FromFile($@"blackboard/{connectedUsers[0].SessionId}/save.png");
+            Graphics g = Graphics.FromImage(bm);
             foreach (UserInput ui in InputHistory)
             {
                 //send sessionid just to be sure it saves
-                ui.renderToBitmap(g, width, height, connectedUsers[0].SessionId);
+                ui.renderToBitmap(g, Width, Height, connectedUsers[0].SessionId);
             }
 
-            //LastTimeSaved = saveTimer.ElapsedMilliseconds - LastTimeSaved;
-
+            bm.Save($@"blackboard/{connectedUsers[0].SessionId}/save.png", ImageFormat.Png);
+            
             InputHistory.Clear();
+            bm.Dispose();
+            g.Dispose();
         }
 
     }

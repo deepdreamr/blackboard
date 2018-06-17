@@ -16,8 +16,8 @@ namespace blackboardserver.Session
 {
     class BlackboardUserBehavior : WebSocketBehavior
     {
-        private delegate void BroadCast<T>(MemoryStream ms, T ob);
-        private BroadCast<Image> SendImg { get; set; }
+        private delegate void SendFile(string path);
+        private SendFile SendImg { get; set; }
         private ulong count = 0L;
 
         public bool IsOwner { get; private set; }
@@ -29,9 +29,10 @@ namespace blackboardserver.Session
 
         public BlackboardUserBehavior()
         {
-           SendImg = (mem, image) =>
+           SendImg = (path) =>
            {
-               image.Save(mem, ImageFormat.Png); Send(mem.ToArray()); 
+               FileInfo info = new FileInfo(path);
+               Send(info);
            };
         }
 
@@ -39,6 +40,8 @@ namespace blackboardserver.Session
         {
             SessionId = ulong.Parse(Context.QueryString["session"]);
             Name = Context.QueryString["name"];
+            string imagePath = $"blackboard/{SessionId}/save.png";
+
             CanDraw = true;
             UserId = count++;
             if (SessionList.sessionMap.ContainsKey(SessionId))
@@ -57,13 +60,17 @@ namespace blackboardserver.Session
             session.connectedUsers.Add(this);
             //add this instance to UserBehaviorList
 
-            Image img = Image.FromFile($@"blackboard/{SessionId}/save.png");
-            
-            using (MemoryStream ms = new MemoryStream())
+            if (!File.Exists(imagePath))
             {
-                SendImg(ms, img);
+                using (Image img = new Bitmap(session.Width, session.Height, PixelFormat.Format32bppArgb))
+                {
+                    Directory.CreateDirectory($@"blackboard/{SessionId}/");
+                    img.Save(imagePath, ImageFormat.Png);
+                }
             }
 
+            SendImg(imagePath);
+            System.Threading.Thread.Sleep(200);
             string input = "";
             foreach (UserInput ui in session.InputHistory)
             {
@@ -72,6 +79,18 @@ namespace blackboardserver.Session
 
             Send(input);
             //send back an instance of the image as well as the InputHistory
+        }
+
+        private void broadcastToOthers(string s)
+        {
+            foreach(IWebSocketSession session in Sessions.Sessions)
+            {
+                if(session is BlackboardUserBehavior && session != this)
+                {
+                    BlackboardUserBehavior behavior = session as BlackboardUserBehavior;
+                    behavior.Send(s);
+                }
+            }
         }
 
         protected override void OnMessage(MessageEventArgs e)
@@ -85,11 +104,15 @@ namespace blackboardserver.Session
             pointlist = 5 5,4 4,3 3
             */
 
+            //send the client data back to everyone else
+
             string[] data = e.Data.Split(',');
             int numInputs = data.Length - 2;
 
             if (numInputs < 1) return;
-            if (numInputs > 100) return;
+            if (numInputs > 500) return;
+
+            Sessions.Broadcast(e.Data);
 
             var session = SessionList.sessionMap[SessionId];
 
@@ -106,7 +129,7 @@ namespace blackboardserver.Session
             for (int i = 2; i < data.Length; i++)
             {
                 String[] p = data[i].Split(' ');
-                newInput.MouseInputs.Add(new Point(int.Parse(p[0]), int.Parse(p[1])));
+                newInput.MouseInputs.Add(new PointF(float.Parse(p[0]), float.Parse(p[1])));
             }
 
             session.InputHistory.Add(newInput);

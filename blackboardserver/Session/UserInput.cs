@@ -12,19 +12,14 @@ namespace blackboardserver.Session
     {
         public Color Color { get; set; }
         public float LineWidth { get; set; }
-        
-        public List<Point> MouseInputs { get; }
+
+        public List<PointF> MouseInputs { get; } = new List<PointF>();
 
         public void renderToBitmap(Graphics g, int width, int height, ulong SessionId)
         {
-            Bitmap bitmap = new Bitmap(width, height);
-            g = Graphics.FromImage(bitmap);
-
             //Add drawing information and points Here
             //If Additional Tools are added it is done Here
             g.DrawLines(new Pen(Color, LineWidth), MouseInputs.ToArray());
-
-            bitmap.Save($@"blackboard/{SessionId}/save.png", ImageFormat.Png);
         }
 
         private static string formatColor(Color c)
@@ -35,7 +30,7 @@ namespace blackboardserver.Session
         public override string ToString()
         {
             string FearTheTurtle = "";
-            foreach (Point p in MouseInputs)
+            foreach (PointF p in MouseInputs)
             {
                 FearTheTurtle += "," + p.X + " " + p.Y;
             }
